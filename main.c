@@ -24,16 +24,19 @@ typedef struct {
 } ProjectionState;
 
 double calculate_tax(double income) {
-    if (income <= 11000)
-        return income * 0.10;
-    else if (income <= 44725)
-        return 1100 + (income - 11000) * 0.12;
-    else if (income <= 95375)
-        return 5147 + (income - 44725) * 0.22;
-    else if (income <= 182050)
-        return 16290 + (income - 95375) * 0.24;
+    double taxable = income - 14600; // income - standard deduction;
+    if (taxable <= 0) 
+        return 0;
+    else if (taxable <= 11000)
+        return taxable * 0.10;
+    else if (taxable <= 44725)
+        return 1100 + (taxable - 11000) * 0.12;
+    else if (taxable <= 95375)
+        return 5147 + (taxable - 44725) * 0.22;
+    else if (taxable <= 182050)
+        return 16290 + (taxable - 95375) * 0.24;
     else
-        return income * 0.37;
+        return taxable * 0.37;
 }
 
 double normal_random(double mean, double stddev) {
@@ -51,8 +54,8 @@ double random_return() {
 ProjectionState advance_one_year(ProjectionState current) {
     ProjectionState next = current;
     next.age += 1;
-    next.balance += (current.income - current.expenses);
-    next.balance -= calculate_tax(current.income);
+    double net_income = current.income - calculate_tax(current.income) - current.expenses;
+    next.balance += net_income;
     double rand_growth_rate = random_return();
     next.balance *= (1 + rand_growth_rate);
     return next;
@@ -66,7 +69,7 @@ int main(int argc, char *argv[]) {
 
     srand(time(NULL));
     int count = 0;
-    int runs = 1000;
+    int runs = 10;
     for (int j = 0; j < runs; j++) {
         ProjectionState state = {
             .age = 30,
@@ -75,7 +78,7 @@ int main(int argc, char *argv[]) {
             .expenses = expenses
         };
 
-        int final_age = 80; 
+        int final_age = 90; 
 
         for (int i = state.age; i <= final_age; i++) {
             if (i >= retirement_age) {
@@ -85,15 +88,15 @@ int main(int argc, char *argv[]) {
 
             // printf("Balance: $%.2f\n", state.balance);
             if (state.balance <= 0) {
+                printf("Broke at age %d: $%.2f\n", state.age, state.balance);
                 break;
             } 
 
          }
 
-       
+        printf("Final balance: $%.2f\n", state.balance);
         if (state.balance > 0) count += 1;
     }
-
     printf("Probablity of success: %f", ((double)count / runs));
     return 0;
 }
