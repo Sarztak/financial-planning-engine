@@ -60,7 +60,10 @@ ProjectionState advance_one_year(ProjectionState current) {
 
 int main(int argc, char *argv[]) {
     double balance = atof(argv[1]);
-    int retirement_age = atoi(argv[2]);
+    double income = atof(argv[2]);
+    double expenses = atof(argv[3]);
+    int retirement_age = atoi(argv[4]);
+
     srand(time(NULL));
     int count = 0;
     int runs = 1000;
@@ -68,16 +71,13 @@ int main(int argc, char *argv[]) {
         ProjectionState state = {
             .age = 30,
             .balance = balance,
-            .income = 60000,
-            .expenses = 40000
+            .income = income,
+            .expenses = expenses
         };
 
-        int final_age = 90; 
+        int final_age = 80; 
 
         for (int i = state.age; i <= final_age; i++) {
-            if (i == retirement_age) {
-                printf("Balance: $%.2f\n", state.balance);
-            }
             if (i >= retirement_age) {
                 state.income = 0; // income stops after retirement age
             }
@@ -94,7 +94,6 @@ int main(int argc, char *argv[]) {
         if (state.balance > 0) count += 1;
     }
 
-    printf("Count: %d\n", count);
     printf("Probablity of success: %f", ((double)count / runs));
     return 0;
 }
