@@ -51,6 +51,21 @@ double random_return() {
     return normal_random(0.10, 0.15);
 }
 
+double gross_withdrawal(double expenses) {
+    // here is what I can understand so my initial guess is the middle value 1. 5 expenses then I check how much I get after taxes. now if this amount is even less that what I want as my expenses then my guess is wrong, I can't really have the amount that I am withdrawing being less than what I want as expense; I want higher than that so my lower limit increases to mid and vice versa if my net is higher than expense then I am withdrawing more so I lower my search range. then at some point low and high converse close enough so that expenses = net and I return the mid point of low and high so the error in estimation can be at max 0.005 dollars
+
+    double low = expenses;
+    double high = expenses * 2;
+    double error = 0.01; // the error is $0.01
+    while (high - low > error) {
+        double mid = (low + high) / 2.0;
+        double net = mid - calculate_tax(mid); // this is amt after taxes
+        if (net < expenses) low = mid; 
+        else high = mid;
+    }
+    return (low + high) / 2.0;
+}
+
 ProjectionState advance_one_year(ProjectionState current) {
     ProjectionState next = current;
     next.age += 1;
@@ -69,7 +84,7 @@ int main(int argc, char *argv[]) {
 
     srand(time(NULL));
     int count = 0;
-    int runs = 10;
+    int runs = 1000;
     for (int j = 0; j < runs; j++) {
         ProjectionState state = {
             .age = 30,
@@ -83,6 +98,8 @@ int main(int argc, char *argv[]) {
         for (int i = state.age; i <= final_age; i++) {
             if (i >= retirement_age) {
                 state.income = 0; // income stops after retirement age
+                state.balance -= gross_withdrawal(state.expenses);
+                // in retirement we withdraw money which is taxable 
             }
             state = advance_one_year(state);
 
