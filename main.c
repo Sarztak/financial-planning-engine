@@ -54,7 +54,7 @@ double normal_random(double mean, double stddev) {
     return mean + z * stddev;
 }
 
-double 401k_gross_withdrawal(double expenses) {
+double gross_withdrawal_401k(double expenses) {
     // here is what I can understand so my initial guess is the middle value 1. 5 expenses then I check how much I get after taxes. now if this amount is even less that what I want as my expenses then my guess is wrong, I can't really have the amount that I am withdrawing being less than what I want as expense; I want higher than that so my lower limit increases to mid and vice versa if my net is higher than expense then I am withdrawing more so I lower my search range. then at some point low and high converse close enough so that expenses = net and I return the mid point of low and high so the error in estimation can be at max 0.005 dollars
 
     double low = expenses;
@@ -106,14 +106,22 @@ double compute_agi(double net_income, double ss_benefit) {
     return (low + high) / 2.0;
 }
 
+double get_taxable_ss(double income, double ss_benefit) {
+    double agi = compute_agi(income, ss_benefit);
+    // agi = income + taxable_ss
+    return agi - income;
+
+}
+
 // this function computes the income for the next year after all the deductions
 ProjectionState advance_one_year(ProjectionState current) {
     ProjectionState next = current;
     next.age += 1;
-    double net_income = current.income - calculate_tax(current.income) - current.expenses;
-    next.balance += net_income;
+    // double net_income = current.income - calculate_tax(current.income) - current.expenses;
+    // next.balance += net_income;
     double rand_growth_rate = normal_random(0.10, 0.15);
-    next.balance *= (1 + rand_growth_rate);
+    if (next.balance > 0) // you cannot invest money you don't have principal unless you are private equity firm;
+        next.balance *= (1 + rand_growth_rate);
     return next;
 }
 
@@ -135,18 +143,82 @@ int main(int argc, char *argv[]) {
         };
 
         int final_age = 90; 
+        double ss_benefit = 42000;
 
         for (int i = state.age; i <= final_age; i++) {
-            if (i >= retirement_age) state.income = 0; // income zero at retirement
-            if (state.age >= 67) state.income += 42000; // income from ss 
 
-            // the logic is income after retirement is zero but then you have
-            // income from the social security.
-            if (i >= retirement_age) {
-                state.balance -= 401k_gross_withdrawal(state.expenses);
-                // in retirement we withdraw money which is taxable 
+            // there are various source of income that gets added
+            // 1. social security after 67
+            // 2. 401K can be added at any time but let us assume now after retirement
+            if (retirement_age < 67) {
+                if (i >= retirement_age) {
+                    if (i < 67) {
+                        // income from salary stops and now comes from 401K withdrawals
+                        // social security has not started yet
+                        state.balance -= (expenses + calculate_tax(expenses));
+                        state.income = 0;
+                    }
+                    else {
+                        // now this is tricky because taxable ss needs the income
+                        // which is coming from 401K but how much to withdraw 401K
+                        // is a decision you might make based on how much social security
+                        // you are getting; here we assume that it is fixed for now
+                        // but it really depends on your age and income history
+                        double withdrawal = expenses - ss_benefit;
+                        if (withdrawal > 0) {
+                            // if withdrawal are greater than zero then withdraw from 401K
+                            double taxable_ss = get_taxable_ss(withdrawal, ss_benefit);
+                            double taxable_income = withdrawal + taxable_ss;
+                            double tax = calculate_tax(taxable_income);
+
+                            // now from the balance the withdrawal amount will be deducted; some portion of that will be submitted as taxes at the year end
+                            // social security amount will be added to the balance
+                            state.balance -= (withdrawal + tax);
+                            state.balance += ss_benefit;
+                        }
+                    }
+                        
+                }
+                else { // i is less than the retirement age
+                    double tax = calculate_tax(state.income);
+                    state.balance += (state.income - tax);
+                }
             }
-            state = advance_one_year(state); // this computes the taxes 
+            else {
+                // now after 67 the ss_benefits will get added as income and that will be taxes as usual
+                if (i <= retirement_age) {
+                    if (i > 67) {
+                        // now this is again tricky; I can directly add ss_benefits to the income because tax on ss depends on the income 
+                        // to model this I am just going to add the ss to the benefits and take out the taxes 
+                        double taxable_ss = get_taxable_ss(state.income, ss_benefit);
+                        double tax = calculate_tax(state.income + taxable_ss);
+                        state.balance += (ss_benefit + state.income);
+                        state.balance -= tax;
+                    }
+                    else {
+                        double tax = calculate_tax(state.income);
+                        state.balance += (state.income - tax);
+                    }
+                }
+                else {
+                    // post retirement income stops 401K withdrawal starts and social security continues after 67
+                    double withdrawal = expenses - ss_benefit;
+                    if (withdrawal > 0) {
+                        // if net_expense are greater than zero then withdraw from 401K
+                        double taxable_ss = get_taxable_ss(withdrawal, ss_benefit);
+                        double taxable_income = withdrawal + taxable_ss;
+                        double tax = calculate_tax(taxable_income);
+
+                        // now from the balance the withdrawal amount will be deducted; some portion of that will be submitted as taxes at the year end
+                        // social security amount will be added to the balance
+                        state.balance -= (withdrawal + tax);
+                        state.balance += ss_benefit;
+                    }
+                }
+            }
+
+            // the advance_one_year should not compute the taxes
+            state = advance_one_year(state);
 
             // printf("Balance: $%.2f\n", state.balance);
             if (state.balance <= 0) {
